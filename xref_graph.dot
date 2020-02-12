@@ -1,0 +1,18 @@
+digraph "xref graph" {
+  "lib/client.ex"
+  "lib/client.ex" -> "lib/dac.ex"
+  "lib/client.ex" -> "lib/monitor.ex"
+  "lib/dac.ex"
+  "lib/database.ex"
+  "lib/database.ex" -> "lib/monitor.ex"
+  "lib/monitor.ex"
+  "lib/raft.ex"
+  "lib/raft.ex" -> "lib/client.ex"
+  "lib/raft.ex" -> "lib/dac.ex"
+  "lib/raft.ex" -> "lib/database.ex"
+  "lib/raft.ex" -> "lib/monitor.ex"
+  "lib/raft.ex" -> "lib/server.ex"
+  "lib/server.ex" -> "lib/state.ex"
+  "lib/server.ex"
+  "lib/state.ex"
+}

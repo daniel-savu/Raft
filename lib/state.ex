@@ -13,7 +13,7 @@ def initialise(config, server_id, servers, databaseP) do
     id:	          server_id,  # server's id (simple int)
     servers:      servers,    # list of process id's of servers
     databaseP:    databaseP,  # process id of local database
-    majority:     div(length(servers)+1, 2),
+    majority:     div(length(servers), 2) + 1,
     votes:        0,          # count of votes incl. self
 
     # -- various process id's - omitted
@@ -25,13 +25,18 @@ def initialise(config, server_id, servers, databaseP) do
     log:          nil,  
 
     # -- raft non-persistent data
-    role:	  :FOLLOWER,
+    role:	  FOLLOWER,
     commit_index: 0,
     last_applied: 0,
     next_index:   Map.new,   
     match_index:  Map.new,   
  
     # add additional state variables of interest
+    leader: nil,
+    next_election_time: :os.system_time(:millisecond) + config.election_timeout + :rand.uniform(config.election_timeout),
+    votes_received: [],
+    next_append_entries_timeout: Map.new,
+    refresh_rate: round(config.election_timeout / 5),
   }
 end # initialise
 
@@ -52,5 +57,10 @@ def match_index(s, i, v), do: Map.put(s, :match_index,
                                   Map.put(s.match_index, i, v))
 
 # add additional setters 
+def leader(s, v),           do: Map.put(s, :leader, v)
+def next_election_time(s, v),           do: Map.put(s, :next_election_time, v)
+def votes_received(s, v),           do: Map.put(s, :votes_received, v)
+def next_append_entries_timeout(s, v),           do: Map.put(s, :next_append_entries_timeout, v)
+
 
 end # State

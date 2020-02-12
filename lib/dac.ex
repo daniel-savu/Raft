@@ -43,7 +43,7 @@ end
 
 defp more_parameters(config) do
   Map.merge config, %{ 
-    debug_level:     0,         # debug level 0  
+    debug_level:     1,         # debug level 0  
     print_after:     2_000,     # print transaction log summary every print_after millisecs
 
     client_requests: 1,    	# max requests each client will make
@@ -54,11 +54,11 @@ defp more_parameters(config) do
     n_accounts:      100,	# number of active bank accounts
     max_amount:      1_000,	# max amount moved between accounts
 
-    election_timeout: 100,	# timeout(ms) for election, randomly from this to 2*this value
+    election_timeout: 50,	# timeout(ms) for election, randomly from this to 2*this value
     append_entries_timeout: 10, # timeout(ms) for expecting reply to append_entries request
 
     crash_servers: %{		# %{ server_num => crash_after_time, ...}
-      1 => 10_000,
+      1 => 4_000,
       3 => 15_000,
     },
   }
