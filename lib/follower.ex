@@ -30,7 +30,7 @@ defmodule Follower do
     def vote_req_logic(s, term, candidate_pid, id) do
 
         s = check_stepdown(s, term)
-        IO.puts "#{s.id} follower: received candidate: #{inspect id} #{s.role}"
+        # IO.puts "#{s.id} follower: received candidate: #{inspect id} #{s.role}"
         if term == s.curr_term && Enum.member?([id, nil], s.voted_for) do
             s = State.voted_for(s, id)
             # IO.puts "#{inspect s.id} voted for #{inspect id}, term #{inspect term}"

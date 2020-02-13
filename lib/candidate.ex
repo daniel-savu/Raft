@@ -25,7 +25,7 @@ defmodule Candidate do
                 if term > s.curr_term do
                     # IO.puts "will stepdown from candidate #{s.id}"
                     s = Follower.stepdown(s, term)
-                    Follower.next(s)
+                    Follower.start(s)
                 end
                 if term == s.curr_term do
                     s =
@@ -34,7 +34,7 @@ defmodule Candidate do
                         else
                             s
                         end
-                    IO.puts "#{s.id}: #{inspect s.votes_received} #{s.role}"
+                    IO.puts "#{s.id}: #{inspect s.votes_received} #{s.role} #{s.curr_term}"
                     if length(s.votes_received) >= s.majority do
                         Leader.start(s)
                     else

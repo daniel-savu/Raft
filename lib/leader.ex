@@ -5,8 +5,9 @@
 defmodule Leader do
 
     def start(s) do
-        IO.puts "found a leader #{inspect s.id} term #{s.curr_term}"
         s = State.role(s, LEADER)
+        IO.puts "found a leader #{inspect s.id} term #{s.curr_term}"
+
         s = State.leader(s, s.selfP)
         new_next_index = Enum.reduce(
             s.servers, 
@@ -29,15 +30,20 @@ defmodule Leader do
     def next(s) do
         broadcast_heartbeats(s)
         # random_failure(s)
+        # random_sleep(s)
 
         receive do
             {:VOTE_REQ, term, candidate_pid, id} ->
                 if term > s.curr_term do
                     # IO.puts "will step down as leader"
-                    Follower.stepdown(s, term)
+                    s = Follower.stepdown(s, term)
+                    Follower.start(s)
                 end
             
-            after s.refresh_rate -> next(s)
+            after s.refresh_rate -> 
+                if s.role == LEADER do
+                    next(s)
+                end
         end
     end
 
@@ -63,6 +69,14 @@ defmodule Leader do
         if(coin > 992) do
             IO.puts "killed leader #{s.id}"
             Process.exit(self(), :kill)
+        end
+    end
+
+    def random_sleep(s) do
+        coin = :rand.uniform(1000)
+        if(coin > 992) do
+            IO.puts "2s sleep leader #{s.id}"
+            Process.sleep(2000)
         end
     end
 
