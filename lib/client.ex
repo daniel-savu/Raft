@@ -35,7 +35,6 @@ def next(c) do
     c    = Map.put(c, :cmd_seqnum, c.cmd_seqnum + 1)
     uid  = { c.id, c.cmd_seqnum }              # unique id for cmd
 
-    client_request = 
     client_request = { :CLIENT_REQUEST, %{clientP: self(), uid: uid, cmd: cmd } }
 
     {c, _client_result} = Client.send_request(c, client_request)  # result not used
