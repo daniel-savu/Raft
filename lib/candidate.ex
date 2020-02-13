@@ -4,9 +4,9 @@
 
 defmodule Candidate do
     def start(s) do
+        s = State.role(s, CANDIDATE)
         s = Follower.reset_election_timeout(s)
         s = State.curr_term(s, s.curr_term + 1)
-        s = State.role(s, CANDIDATE)
         s = State.voted_for(s, s.id)
         s = State.votes_received(s, [s.id])
         for server <- s.servers do
@@ -23,16 +23,18 @@ defmodule Candidate do
         receive do
             {:VOTE_REPLY, term, voted_for, voter_pid, id} ->
                 if term > s.curr_term do
+                    # IO.puts "will stepdown from candidate #{s.id}"
                     s = Follower.stepdown(s, term)
                     Follower.next(s)
-                else
+                end
+                if term == s.curr_term do
                     s =
                         if voted_for == s.id do
                             State.votes_received(s, [id | s.votes_received])
                         else
                             s
                         end
-                    IO.puts "#{s.id}: #{inspect s.votes_received}"
+                    IO.puts "#{s.id}: #{inspect s.votes_received} #{s.role}"
                     if length(s.votes_received) >= s.majority do
                         Leader.start(s)
                     else
@@ -41,7 +43,7 @@ defmodule Candidate do
                 end
 
             {:VOTE_REQ, term, candidate_pid, id} ->
-                IO.puts "#{s.id}: received candidate: #{inspect id}"
+                # IO.puts "#{s.id}: received candidate: #{inspect id}"
                 if term > s.curr_term do
                     Follower.vote_req_logic(s, term, candidate_pid, id)
                 else 
@@ -51,12 +53,15 @@ defmodule Candidate do
                     end
                 end
 
-            {:HEARTBEAT, term, leader_pid} ->
+            {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index} ->
                 # IO.puts "HB #{s.id} #{s.curr_term} #{term}"
-                s = Follower.handle_heartbeat(s, term, leader_pid)
-                Follower.next(s)
+                s = Follower.handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index)
+                Follower.start(s)
 
-            after s.refresh_rate -> next(s)
+            after s.refresh_rate -> 
+                if s.role == CANDIDATE do
+                    next(s)
+                end
         end
     end
 

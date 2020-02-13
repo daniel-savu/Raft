@@ -22,7 +22,7 @@ def initialise(config, server_id, servers, databaseP) do
     # -- update on stable storage before replying to requests
     curr_term:	  0,
     voted_for:	  nil,
-    log:          nil,  
+    log:          [],  
 
     # -- raft non-persistent data
     role:	  FOLLOWER,
