@@ -53,7 +53,8 @@ defmodule Candidate do
                 IO.puts "#{s.id}: received candidate: #{inspect id} #{s.role}"
                 if term > s.curr_term do
                     s = Follower.stepdown(s, term)
-                    Follower.vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
+                    s = Follower.vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
+                    Follower.next(s)
                 else 
                     if term == s.curr_term do
                         send candidate_pid, {:VOTE_REPLY, term, s.voted_for, self(), s.id}
@@ -62,7 +63,6 @@ defmodule Candidate do
                 end
 
             {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index} ->
-                # IO.puts "HB #{s.id} #{s.curr_term} #{term}"
                 s = Follower.handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index)
                 Follower.start(s)
 

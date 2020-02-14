@@ -13,7 +13,8 @@ defmodule Follower do
         s = Follower.commit_to_state_machine_if_needed(s)
         receive do
             {:VOTE_REQ, term, candidate_pid, id, last_log_term, last_log_index} ->
-                vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
+                s = vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
+                next(s)
 
             {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index} ->
                 # IO.puts "HB #{s.id} #{s.curr_term} #{term}"
@@ -32,16 +33,19 @@ defmodule Follower do
         s = check_stepdown(s, term)
         IO.puts "#{s.id} follower: received candidate: #{inspect id} #{s.role}"
         log_term = Leader.get_log_term(s, length(s.log) - 1)
-        if term == s.curr_term && Enum.member?([id, nil], s.voted_for) && 
-        (last_log_term > log_term || 
-        (last_log_term == log_term && last_log_index >= length(s.log) - 1))
-        do
-            s = State.voted_for(s, id)
-            # IO.puts "#{inspect s.id} voted for #{inspect id}, term #{inspect term}"
-            send candidate_pid, {:VOTE_REPLY, term, s.voted_for, self(), s.id}
-            s = reset_election_timeout(s)
-            Follower.next(s)
-        end
+        s =
+            if term == s.curr_term && Enum.member?([id, nil], s.voted_for) && 
+            (last_log_term > log_term || 
+            (last_log_term == log_term && last_log_index >= length(s.log) - 1))
+            do
+                s = State.voted_for(s, id)
+                # IO.puts "#{inspect s.id} voted for #{inspect id}, term #{inspect term}"
+                send candidate_pid, {:VOTE_REPLY, term, s.voted_for, self(), s.id}
+                s = reset_election_timeout(s)
+            else
+                s
+            end
+        s
     end
 
     def handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index) do
@@ -53,13 +57,13 @@ defmodule Follower do
             else
                 s = State.leader(s, leader_pid)
                 # s = reset_election_timeout(s)
-                # IO.puts "#{prev_log_index}"
+                # IO.puts "LENGTHS #{prev_log_index} #{length(s.log) - 1}"
                 success = 
                     if prev_log_index == 0 do
                         true
                     else 
                         if prev_log_index < length(s.log) - 1 do
-                            term = Leader.get_log_term(s, prev_log_index)
+                            term = Leader.get_log_term(s, prev_log_index - 1)
                             term == prev_log_term
                         else
                             false
@@ -77,8 +81,11 @@ defmodule Follower do
                 index = elem(elem(result,0),0)
                 s = elem(elem(result,0),1)
                 # IO.puts "#{s.id} #{inspect s.log}"
-                # IO.puts "#{s.id} #{inspect index}"
-                send leader_pid, {:APPEND_REPLY, self(), s.curr_term, success, index}
+                # IO.puts "#{s.id} sucess #{inspect success} index: #{inspect index}"
+                timenow = :os.system_time(:millisecond)
+                # IO.puts "#{s.id} #{inspect {:APPEND_REPLY, self(), s.curr_term, success, index, timenow}}"
+
+                send leader_pid, {:APPEND_REPLY, self(), s.curr_term, success, index, timenow}
                 handle_heartbeat(s, term, leader_pid)
             end
         s
@@ -127,8 +134,11 @@ defmodule Follower do
 
     def store_entries(s, prev_log_index, entries, leader_commit_index) do
         log_to_keep = Enum.slice(s.log, 0, prev_log_index)
-        rest_of_log = Enum.slice(s.log, prev_log_index, length(s.log))
+        rest_of_log = Enum.slice(s.log, prev_log_index, length(entries))
         new_log = store_entries(entries, log_to_keep, rest_of_log)
+        # IO.puts "#{s.id} entries:#{inspect entries} #{prev_log_index}"
+        # IO.puts "#{s.id} log to keep:#{inspect log_to_keep}; rest_of_log: #{inspect rest_of_log}; prevlog: #{prev_log_index}"
+        # IO.puts "#{s.id} new log:#{inspect new_log}"
         s = State.log(s, new_log)
         commit_index = 
             if leader_commit_index > s.commit_index do

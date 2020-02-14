@@ -35,7 +35,7 @@ def initialise(config, server_id, servers, databaseP) do
     leader: nil,
     next_election_time: :os.system_time(:millisecond) + config.election_timeout + :rand.uniform(config.election_timeout),
     votes_received: [],
-    refresh_rate: round(config.election_timeout / 10),
+    refresh_rate: round(config.election_timeout/1.2),
   }
 end # initialise
 
