@@ -35,7 +35,7 @@ def initialise(config, server_id, servers, databaseP) do
     leader: nil,
     next_election_time: :os.system_time(:millisecond) + config.election_timeout + :rand.uniform(config.election_timeout),
     votes_received: [],
-    refresh_rate: round(config.election_timeout / 5),
+    refresh_rate: round(config.election_timeout / 10),
   }
 end # initialise
 
@@ -59,6 +59,6 @@ def match_index(s, i, v), do: Map.put(s, :match_index,
 def leader(s, v),           do: Map.put(s, :leader, v)
 def next_election_time(s, v),           do: Map.put(s, :next_election_time, v)
 def votes_received(s, v),           do: Map.put(s, :votes_received, v)
-
+def log(s, v), do: Map.put(s, :log, v)
 
 end # State

@@ -16,10 +16,7 @@ end # start
 
 def next(s) do
     # IO.puts "#{s.id} #{inspect s.next_election_time} #{:os.system_time(:millisecond)}"
-    receive do
-        
-        after s.refresh_rate -> next(s)
-    end
+
 end # next
 
 end # Server

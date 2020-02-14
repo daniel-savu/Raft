@@ -9,9 +9,12 @@ defmodule Candidate do
         s = State.curr_term(s, s.curr_term + 1)
         s = State.voted_for(s, s.id)
         s = State.votes_received(s, [s.id])
+        last_log_term = Leader.get_log_term(s, length(s.log) - 1)
+        last_log_index = Leader.get_log_index(s)
+        IO.puts "candidate #{s.id}"
         for server <- s.servers do
             if server != self() do
-                send server, {:VOTE_REQ, s.curr_term, self(), s.id}
+                send server, {:VOTE_REQ, s.curr_term, self(), s.id, last_log_term, last_log_index}
             end
         end
         Candidate.next(s)
@@ -19,8 +22,12 @@ defmodule Candidate do
 
     def next(s) do
         Follower.check_elapsed_election_time(s)
+        s = Follower.commit_to_state_machine_if_needed(s)
 
         receive do
+            # {:CLIENT_REQUEST, m} ->
+            #     IO.puts "client req"
+            #     next(s)
             {:VOTE_REPLY, term, voted_for, voter_pid, id} ->
                 if term > s.curr_term do
                     # IO.puts "will stepdown from candidate #{s.id}"
@@ -42,10 +49,11 @@ defmodule Candidate do
                     end
                 end
 
-            {:VOTE_REQ, term, candidate_pid, id} ->
-                # IO.puts "#{s.id}: received candidate: #{inspect id}"
+            {:VOTE_REQ, term, candidate_pid, id, last_log_term, last_log_index} ->
+                IO.puts "#{s.id}: received candidate: #{inspect id} #{s.role}"
                 if term > s.curr_term do
-                    Follower.vote_req_logic(s, term, candidate_pid, id)
+                    s = Follower.stepdown(s, term)
+                    Follower.vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
                 else 
                     if term == s.curr_term do
                         send candidate_pid, {:VOTE_REPLY, term, s.voted_for, self(), s.id}

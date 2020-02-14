@@ -18,7 +18,7 @@ def next(db) do
   receive do
   { :EXECUTE, command } ->  # should send a result back, but assuming always okay
     { :move, amount, account1, account2 } = command
-
+    IO.puts "writing to db"
     balance1 = Map.get db.balances, account1, 0
     balance2 = Map.get db.balances, account2, 0
     db = Database.balances(db, account1, balance1 + amount)
