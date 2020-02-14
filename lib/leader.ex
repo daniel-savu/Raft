@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consenus, v1
 
 defmodule Leader do
@@ -8,7 +8,7 @@ defmodule Leader do
         s = State.role(s, LEADER)
         broadcast_heartbeats(s)
         s = Follower.reset_election_timeout(s)
-        IO.puts "found a leader #{inspect s.id} term #{s.curr_term}"
+        IO.puts "elected #{inspect s.id} as leader in term #{s.curr_term}"
 
         s = State.leader(s, s.selfP)
         new_next_index = Enum.reduce(
@@ -39,16 +39,23 @@ defmodule Leader do
 
         receive do
             {:CLIENT_REQUEST, m} ->
-                IO.puts "client req"
+                broadcast_heartbeats(s)
                 clientP = m.clientP
-                uid = m.uid
+                {uid, _seqnum} = m.uid
                 cmd = m.cmd
-                Monitor.notify s, { :CLIENT_REQUEST, clientP }
-
-                # need to store client/uid/cmd pair so as to know which client to reply to
-                # when entry is committed
-                s = State.log(s, s.log ++ [{cmd, s.curr_term}])
-                s = State.match_index(s, self(), Map.get(s.match_index, self()) + 1)
+                request = {cmd, s.curr_term, clientP, uid}
+                # a = 
+                # IO.puts a
+                s =
+                    if request_not_already_received(s.log, request) do
+                        Monitor.notify s, { :CLIENT_REQUEST, s.id }
+                        s = State.log(s, s.log ++ [request])
+                        s = State.match_index(s, self(), Map.get(s.match_index, self()) + 1)
+                        broadcast_heartbeats(s)
+                        s
+                    else
+                        s
+                    end
                 # IO.puts "log: #{inspect s.log}"
                 broadcast_heartbeats(s)
                 next(s)
@@ -61,7 +68,7 @@ defmodule Leader do
                     Follower.next(s)
                 end
 
-            {:APPEND_REPLY, pid, term, success, index, timenow} ->
+            {:APPEND_REPLY, pid, term, success, index, _, _} ->
                 # IO.puts "#{inspect pid} received #{inspect {:APPEND_REPLY, pid, term, success, index, timenow}}"
                 s =
                     if term > s.curr_term do
@@ -88,9 +95,9 @@ defmodule Leader do
                 # IO.puts "append_reply "
                 next(s)
 
-            {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index} ->
+            {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index, id} ->
                 if term > s.curr_term do
-                    s = Follower.handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index)
+                    s = Follower.handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index, id)
                     Follower.start(s)
                 else
                     next(s)
@@ -118,25 +125,39 @@ defmodule Leader do
 
         # IO.puts "prevlogindex #{prev_log_index}"
         # IO.puts "#{inspect server} nextindex #{inspect s.next_index} #{Map.get(s.next_index, server)} #{length(s.log) - 1}; prevlogindex #{prev_log_index}"
-        
         entries = Enum.slice(s.log, prev_log_index, length(s.log))
-        send server, {:APPEND_REQ, s.curr_term, self(), prev_log_index, prev_log_term, entries, s.commit_index}
+        send server, {:APPEND_REQ, s.curr_term, self(), prev_log_index, prev_log_term, entries, s.commit_index, s.id}
+    end
+
+    def request_not_already_received([], _) do
+        true
+    end
+
+    def request_not_already_received([head|s], request) do
+        {_, _, clientPHead, uidHead} = head
+        {_, _, clientPRequest, uidRequest} = request
+        # IO.puts "#{inspect uidHead} #{inspect uidRequest}"
+        if uidHead == uidRequest && clientPHead == clientPRequest do
+            false
+        else
+            request_not_already_received(s, request)
+        end
     end
 
     # function used to test the resilience of the leader election implementation
     def random_failure(s) do
         coin = :rand.uniform(1000)
-        if(coin > 992) do
+        if(coin > 994) do
             IO.puts "killed leader #{s.id}"
             Process.exit(self(), :kill)
         end
     end
 
     def random_sleep(s) do
-        coin = :rand.uniform(1000)
-        if(coin > 993) do
-            IO.puts "2s sleep leader #{s.id}"
-            Process.sleep(2000)
+        coin = :rand.uniform(100000)
+        if(coin > 99999) do
+            IO.puts "5s sleep leader #{s.id}"
+            Process.sleep(5000)
         end
     end
 
@@ -144,7 +165,7 @@ defmodule Leader do
         if index >= length(s.log) || index < 0 do
             0
         else
-            {_, last_log_term} = Enum.at(s.log, index)
+            {_, last_log_term, _, _} = Enum.at(s.log, index)
             last_log_term
         end
     end
@@ -168,8 +189,9 @@ defmodule Leader do
             else
                 s
             end
-        # IO.puts "match_index. leader: #{s.id} commit: #{s.commit_index}"
+        # IO.puts "match_index #{inspect match_indexes}. leader: #{s.id} commit: #{s.commit_index}"
         # IO.inspect match_indexes
+        Monitor.notify s, { :MATCH_INDEXES, match_indexes }
         s
     end
 

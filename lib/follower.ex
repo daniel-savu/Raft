@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consenus, v1
 
 defmodule Follower do
@@ -9,6 +9,8 @@ defmodule Follower do
     end
 
     def next(s) do
+        # IO.puts "#{s.id} #{inspect s.leader}"
+
         Follower.check_elapsed_election_time(s)
         s = Follower.commit_to_state_machine_if_needed(s)
         receive do
@@ -16,10 +18,17 @@ defmodule Follower do
                 s = vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index)
                 next(s)
 
-            {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index} ->
+            {:APPEND_REQ, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index, id} ->
                 # IO.puts "HB #{s.id} #{s.curr_term} #{term}"
                 # s = handle_heartbeat(s, term, leader_pid)
-                s = handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index)
+                s = handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index, id)
+                next(s)
+
+            {:CLIENT_REQUEST, m} ->
+                if s.leader != nil do
+                    clientP = m.clientP
+                    send s.leader, {:CLIENT_REQUEST, m}
+                end
                 next(s)
             
             after s.refresh_rate -> 
@@ -31,7 +40,7 @@ defmodule Follower do
 
     def vote_req_logic(s, term, candidate_pid, id, last_log_term, last_log_index) do
         s = check_stepdown(s, term)
-        IO.puts "#{s.id} follower: received candidate: #{inspect id} #{s.role}"
+        # IO.puts "#{s.id} follower: received candidate: #{inspect id} #{s.role} term #{term}"
         log_term = Leader.get_log_term(s, length(s.log) - 1)
         s =
             if term == s.curr_term && Enum.member?([id, nil], s.voted_for) && 
@@ -48,14 +57,17 @@ defmodule Follower do
         s
     end
 
-    def handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index) do
+    def handle_append_request(s, term, leader_pid, prev_log_index, prev_log_term, entries, leader_commit_index, id) do
+
         s = check_stepdown(s, term)
         s = 
             if term < s.curr_term do
-                send leader_pid, {:APPEND_REPLY, s.curr_term, false, 0}
+                send leader_pid, {:APPEND_REPLY, s.curr_term, false, 0, s.id}
                 s
             else
                 s = State.leader(s, leader_pid)
+                # IO.puts "#{s.id} #{inspect s.leader}, however #{inspect leader_pid}, id #{id}"
+
                 # s = reset_election_timeout(s)
                 # IO.puts "LENGTHS #{prev_log_index} #{length(s.log) - 1}"
                 success = 
@@ -85,7 +97,7 @@ defmodule Follower do
                 timenow = :os.system_time(:millisecond)
                 # IO.puts "#{s.id} #{inspect {:APPEND_REPLY, self(), s.curr_term, success, index, timenow}}"
 
-                send leader_pid, {:APPEND_REPLY, self(), s.curr_term, success, index, timenow}
+                send leader_pid, {:APPEND_REPLY, self(), s.curr_term, success, index, timenow, s.id}
                 handle_heartbeat(s, term, leader_pid)
             end
         s
@@ -124,7 +136,7 @@ defmodule Follower do
     end
 
     def stepdown(s, term) do
-        IO.puts "stepdown #{s.id}"
+        # IO.puts "stepdown #{s.id}"
         s = State.curr_term(s, term)
         s = State.role(s, FOLLOWER)
         s = State.voted_for(s, nil)
@@ -155,18 +167,22 @@ defmodule Follower do
     end
     
     def store_entries([entries_iterator|entries], log_acc, [log_iterator|rest_of_log]) do
-        {_, log_term} = log_iterator
-        {_, entry_term} = entries_iterator
+        {_, log_term, _, _} = log_iterator
+        {_, entry_term, _, _} = entries_iterator
         # if log_term != entry_term do
         store_entries(entries, log_acc ++ [entries_iterator], rest_of_log)
     end
 
     def commit_to_state_machine_if_needed(s) do
         if s.commit_index > s.last_applied do
-            {cmd, _} = Enum.at(s.log, s.last_applied)
+            {cmd, _, clientP, _} = Enum.at(s.log, s.last_applied)
             s = State.last_applied(s, s.last_applied + 1)
-            IO.puts "#{inspect cmd}"
+            # IO.puts "#{inspect cmd}"
             send s.databaseP, {:EXECUTE, cmd}
+            if s.role == LEADER do
+                result = %{leaderP: self(), cmd: cmd}
+                send clientP, { :CLIENT_REPLY, result }
+            end
             s
         else
             s

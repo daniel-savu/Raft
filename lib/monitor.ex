@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consensus, v1
 
 defmodule Monitor do
@@ -44,6 +44,7 @@ def start(config) do
     requests:           Map.new,
     updates:            Map.new,
     moves:              Map.new,
+    match_indexes:      []
     # rest omitted
   }
   Process.send_after(self(), { :PRINT }, state.config.print_after)
@@ -91,6 +92,10 @@ def next(state) do
     state = Monitor.requests(state, server_num, Map.get(state.requests, server_num, 0) + 1)
     Monitor.next(state)
 
+  { :MATCH_INDEXES, match_indexes } ->  # client requests seen by leaders
+    state = Map.put(state, :match_indexes, match_indexes)
+    Monitor.next(state)
+
   { :DB_UPDATE, server_id, seqnum, command } ->  # client requests seen by leaders
     state = Monitor.updates(state, server_id, Map.get(state.updates, server_id, 0) + 1)
     Monitor.next(state)
@@ -102,6 +107,7 @@ def next(state) do
     IO.puts "time = #{clock}      db updates done = #{inspect sorted}"
     sorted = state.requests |> Map.to_list |> List.keysort(0)
     IO.puts "time = #{clock} client requests seen = #{inspect sorted}"
+    IO.puts "time = #{clock}        match_indexes = #{inspect state.match_indexes}"
 
     if state.config.debug_level >= 0 do  # always
       min_done   = state.updates  |> Map.values |> Enum.min(fn -> 0 end)

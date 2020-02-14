@@ -5,7 +5,7 @@
 SERVERS  = 5
 CLIENTS  = 5
 START    = Raft.start
-MAX_TIME = 10000
+MAX_TIME = 30000
 
 HOST	:= 127.0.0.1
 

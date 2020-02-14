@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consensus, v1
 
 defmodule Client do

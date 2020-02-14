@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consensus, v1
 
 defmodule State do
@@ -35,7 +35,7 @@ def initialise(config, server_id, servers, databaseP) do
     leader: nil,
     next_election_time: :os.system_time(:millisecond) + config.election_timeout + :rand.uniform(config.election_timeout),
     votes_received: [],
-    refresh_rate: round(config.election_timeout/1.2),
+    refresh_rate: round(config.election_timeout / 10),
   }
 end # initialise
 

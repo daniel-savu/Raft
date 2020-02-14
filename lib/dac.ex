@@ -1,5 +1,5 @@
 
-# distributed algorithms, n.dulay, 4 feb 2020
+# Ioan-Daniel Savu (is319) 
 # coursework, raft consensus, v1
 
 # various helper functions
@@ -54,7 +54,7 @@ defp more_parameters(config) do
     n_accounts:      100,	# number of active bank accounts
     max_amount:      1_000,	# max amount moved between accounts
 
-    election_timeout: 1000,	# timeout(ms) for election, randomly from this to 2*this value
+    election_timeout: 200,	# timeout(ms) for election, randomly from this to 2*this value
     append_entries_timeout: 10, # timeout(ms) for expecting reply to append_entries request
 
     crash_servers: %{		# %{ server_num => crash_after_time, ...}
