@@ -31,7 +31,8 @@ defmodule Candidate do
                     s = Follower.stepdown(s, term)
                     Follower.start(s)
                 end
-                if term == s.curr_term do
+                if term <= s.curr_term do
+                    s = Follower.reset_election_timeout(s)
                     s =
                         if voted_for == s.id do
                             State.votes_received(s, [id | s.votes_received])
